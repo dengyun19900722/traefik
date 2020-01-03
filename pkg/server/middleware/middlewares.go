@@ -16,7 +16,7 @@ import (
 	"github.com/containous/traefik/v2/pkg/middlewares/circuitbreaker"
 	"github.com/containous/traefik/v2/pkg/middlewares/compress"
 	"github.com/containous/traefik/v2/pkg/middlewares/customerrors"
-	"github.com/containous/traefik/v2/pkg/middlewares/collaborForward"
+	"github.com/containous/traefik/v2/pkg/middlewares/collaborforward"
 	"github.com/containous/traefik/v2/pkg/middlewares/headers"
 	"github.com/containous/traefik/v2/pkg/middlewares/huaweilogin"
 	"github.com/containous/traefik/v2/pkg/middlewares/inflightreq"
@@ -195,14 +195,14 @@ func (b *Builder) buildConstructor(ctx context.Context, middlewareName string) (
 		}
 	}
 
-	// collaborForward
+	// collaborforward
 	if config.CollaborForward != nil {
 		if middleware != nil {
 			return nil, badConf
 		}
-		fmt.Println("create collaborForward middleware begin...")
+		fmt.Println("create collaborforward middleware begin...")
 		middleware = func(next http.Handler) (http.Handler, error) {
-			return collaborForward.New(ctx, next, *config.CollaborForward, middlewareName)
+			return collaborforward.New(ctx, next, *config.CollaborForward, middlewareName)
 		}
 	}
 
