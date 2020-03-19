@@ -15,6 +15,6 @@ git checkout v2.0
 make binary
 
 ### 4. build traefik image
-
+docker login  ycdocker9527/ca0987hf
 docker build -t ycdocker9527/traefik:2.0.0-co-forward .
 docker push ycdocker9527/traefik:2.0.0-co-forward

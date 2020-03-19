@@ -10,17 +10,17 @@ import (
 	"github.com/containous/traefik/v2/pkg/middlewares"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"strings"
 	"time"
 )
 
-
 const (
-	contentType = "Content-Type"
-	CoCenterInfoApiPath string = "/co/center/local"
+	contentType                    = "Content-Type"
+	CoCenterInfoApiPath     string = "/co/center/local"
 	NextCoCenterInfoApiPath string = "/co/center/next"
-	OptimalNetPathApiPath string = "/net/path/optimum"
+	OptimalNetPathApiPath   string = "/net/path/optimum"
 )
 
 var myClient = &http.Client{Timeout: 15 * time.Second}
@@ -32,26 +32,32 @@ type collaborForward struct {
 }
 
 type coCenterInfo struct {
-	Code         string
-	GatewayIp    string
-	GatewayPort  string
+	Code        string
+	GatewayIp   string
+	GatewayPort string
 }
 
 type coCenterInfoMsg struct {
-	Status  int
-	Memo    string
-	Result  coCenterInfo
+	Status int
+	Memo   string
+	Result coCenterInfo
 }
 
 type optimalPathInfoMsg struct {
-	Status  int
-	Memo    string
-	Result  string
+	Status int
+	Memo   string
+	Result string
 }
 
 type forwardHandler struct {
-	location *url.URL
+	location  *url.URL
 	permanent bool
+}
+
+type TargetHost struct {
+	Host    string
+	IsHttps bool
+	CAPath  string
 }
 
 func New(ctx context.Context, next http.Handler, config dynamic.CollaborForward, name string) (http.Handler, error) {
@@ -76,7 +82,7 @@ func (s *collaborForward) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 	//query local collabor center info
-	localCoCenterInfo, err := queryCoCenterInfo(s.cocoAgentUrl + CoCenterInfoApiPath, "")
+	localCoCenterInfo, err := queryCoCenterInfo(s.cocoAgentUrl+CoCenterInfoApiPath, "")
 	if err != nil {
 		fmt.Println("local collabor center info query failed，please check the reason ...")
 		exceptionResponse(rw, req)
@@ -85,7 +91,7 @@ func (s *collaborForward) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// source gateway should query optimal network path
 	if xRoutePath == "" {
 		//source gateway - query optimal network path
-		optimalPath, err := queryOptimalNetPath(s.cocoAgentUrl + OptimalNetPathApiPath, destCenterCode)
+		optimalPath, err := queryOptimalNetPath(s.cocoAgentUrl+OptimalNetPathApiPath, destCenterCode)
 		if err != nil {
 			fmt.Println("optimal network path query failed，please check the reason ...")
 			exceptionResponse(rw, req)
@@ -93,11 +99,12 @@ func (s *collaborForward) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		}
 		req.Header.Set("X-Route-Path", optimalPath)
 		xRoutePath = optimalPath
+		fmt.Println("optimal network path is :", optimalPath)
 	}
 	gatewayType, nextCoCenterCode := fetchGatewayType(localCoCenterInfo.Code, xRoutePath)
 	if nextCoCenterCode != "" {
 		//query next collabor center info
-		* nextCoCenterInfo , err = queryCoCenterInfo(s.cocoAgentUrl + NextCoCenterInfoApiPath, nextCoCenterCode)
+		*nextCoCenterInfo, err = queryCoCenterInfo(s.cocoAgentUrl+NextCoCenterInfoApiPath, nextCoCenterCode)
 		if err != nil {
 			fmt.Println("next collabor center info query failed，please check the reason ...", err)
 			exceptionResponse(rw, req)
@@ -106,23 +113,29 @@ func (s *collaborForward) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	//set XForwardedFor header
-	buildXForwardedForHeader(gatewayType,localCoCenterInfo.GatewayIp, req)
+	buildXForwardedForHeader(gatewayType, localCoCenterInfo.GatewayIp, req)
 	// forward logic
 	if gatewayType == 3 {
 		//target gateway
 		s.next.ServeHTTP(rw, req)
 	} else {
-		parsedUrl, err := url.Parse("http://" + nextCoCenterInfo.GatewayIp + ":" + nextCoCenterInfo.GatewayPort + req.RequestURI)
-		if err !=nil {
-			exceptionResponse(rw, req)
-			return
-		}
-		handler := &forwardHandler{location: parsedUrl, permanent:true}
-		handler.ServeHTTP(rw, req)
+		parsedUrl := "http://" + nextCoCenterInfo.GatewayIp + ":" + nextCoCenterInfo.GatewayPort + req.RequestURI
+		HostReverseProxy(rw, req, parsedUrl)
 	}
 }
 
-func (f *forwardHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+func HostReverseProxy(w http.ResponseWriter, req *http.Request, targetHost string) {
+	remote, err := url.Parse(targetHost)
+	if err != nil {
+		fmt.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	proxy := httputil.NewSingleHostReverseProxy(remote)
+	proxy.ServeHTTP(w, req)
+}
+
+/*func (f *forwardHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Set("Location", f.location.String())
 	status := http.StatusFound
 	if req.Method != http.MethodGet {
@@ -139,7 +152,7 @@ func (f *forwardHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
 	}
-}
+}*/
 
 func queryOptimalNetPath(optimalNetPathUrl string, destCenterCode string) (string, error) {
 	optimalPathInfoResultMsg := new(optimalPathInfoMsg)
@@ -184,14 +197,14 @@ func fetchGatewayType(coCenterCode string, xRoutePath string) (int, string) {
 	pathArray := strings.Split(xRoutePath, ",")
 	index := indexOf(coCenterCode, pathArray)
 	if index == 0 {
-		nextCoCenterCode = pathArray[index + 1]
+		nextCoCenterCode = pathArray[index+1]
 		gatewayType = 1
-	} else if index == len(pathArray) - 1 {
+	} else if index == len(pathArray)-1 {
 		fmt.Println("target gateway has no nextCoCenter ...")
 		nextCoCenterCode = ""
 		gatewayType = 3
 	} else {
-		nextCoCenterCode = pathArray[index + 1]
+		nextCoCenterCode = pathArray[index+1]
 		gatewayType = 2
 	}
 	return gatewayType, nextCoCenterCode
@@ -222,5 +235,5 @@ func indexOf(element string, data []string) int {
 			return k
 		}
 	}
-	return -1    //not found.
+	return -1 //not found.
 }
