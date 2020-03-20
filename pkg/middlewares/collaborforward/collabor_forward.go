@@ -120,6 +120,8 @@ func (s *collaborForward) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		s.next.ServeHTTP(rw, req)
 	} else {
 		parsedUrl := "http://" + nextCoCenterInfo.GatewayIp + ":" + nextCoCenterInfo.GatewayPort + req.RequestURI
+		fmt.Println("RequestURI == ", req.RequestURI)
+		fmt.Println("parsedUrl == ", parsedUrl)
 		HostReverseProxy(rw, req, parsedUrl)
 	}
 }
@@ -131,6 +133,7 @@ func HostReverseProxy(w http.ResponseWriter, req *http.Request, targetHost strin
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	fmt.Println("parsedUrl == ", remote.String())
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	proxy.ServeHTTP(w, req)
 }
