@@ -117,10 +117,10 @@ func (s *collaborForward) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	// forward logic
 	if gatewayType == 3 {
 		//target gateway
+		fmt.Println("forward to target gateway...")
 		s.next.ServeHTTP(rw, req)
 	} else {
-		parsedUrl := "http://" + nextCoCenterInfo.GatewayIp + ":" + nextCoCenterInfo.GatewayPort + req.RequestURI
-		fmt.Println("RequestURI == ", req.RequestURI)
+		parsedUrl := "http://" + nextCoCenterInfo.GatewayIp + ":" + nextCoCenterInfo.GatewayPort
 		fmt.Println("parsedUrl == ", parsedUrl)
 		HostReverseProxy(rw, req, parsedUrl)
 	}
@@ -134,6 +134,7 @@ func HostReverseProxy(w http.ResponseWriter, req *http.Request, targetHost strin
 		return
 	}
 	fmt.Println("parsedUrl == ", remote.String())
+	//httputil的反向代理功能，会去拿request里的Uri，所以只需要指定host（ip：端口）即可，不需要完整api地址  == 反省代理模式等同于主机替换
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	proxy.ServeHTTP(w, req)
 }
