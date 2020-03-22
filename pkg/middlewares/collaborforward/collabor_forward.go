@@ -77,7 +77,8 @@ func (s *collaborForward) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	//destCenterCode := "1510002"
 	if destCenterCode == "" {
 		log.WithoutContext().Infof("local traffic without collabor...")
-		s.next.ServeHTTP(rw, req)
+		//s.next.ServeHTTP(rw, req)
+		return
 	}
 	//query local collabor center info
 	localCoCenterInfo, err := queryCoCenterInfo(s.cocoAgentUrl+CoCenterInfoApiPath, "")
