@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/containous/traefik/v2/pkg/config/dynamic"
-	log "github.com/containous/traefik/v2/pkg/log"
+	"github.com/containous/traefik/v2/pkg/log"
 	"github.com/containous/traefik/v2/pkg/middlewares"
 	"io/ioutil"
 	"net/http"
